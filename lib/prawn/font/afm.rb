@@ -41,6 +41,8 @@ module Prawn
 
         super
 
+        @@winansi     ||= Prawn::Encoding::WinAnsi.new
+
         @attributes     = {}
         @glyph_widths   = {}
         @bounding_boxes = {}
@@ -86,8 +88,8 @@ module Prawn
       # string. Changes the encoding in-place, so the argument itself
       # is replaced with a string in WinAnsi encoding.
       #
-      def normalize_encoding(text)
-        enc = Prawn::Encoding::WinAnsi.new
+      def normalize_encoding(text) 
+        enc = @@winansi
         text.unpack("U*").collect { |i| enc[i] }.pack("C*")
       rescue ArgumentError
         raise Prawn::Errors::IncompatibleStringEncoding,
@@ -200,7 +202,7 @@ module Prawn
 
         kern_pairs = latin_kern_pairs_table
 
-        string.unpack("C*").each do |byte|
+        string.bytes do |byte|
           if k = last_byte && kern_pairs[[last_byte, byte]]
             kerned << -k << [byte]
           else
@@ -236,7 +238,7 @@ module Prawn
       def unscaled_width_of(string)
         glyph_table = latin_glyphs_table
         
-        string.unpack("C*").inject(0) do |s,r|
+        string.bytes.inject(0) do |s,r|
           s + glyph_table[r]
         end
       end
