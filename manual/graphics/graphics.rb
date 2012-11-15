@@ -28,7 +28,9 @@ Prawn::Example.generate("graphics.pdf", :page_size => "FOLIO") do
       s.example "stroke_join"
       s.example "stroke_dash"
       s.example "color"
+      s.example "gradients"
       s.example "transparency"
+      s.example "soft_masks"
       s.example "fill_rules"
     end
     
