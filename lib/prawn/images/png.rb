@@ -23,6 +23,10 @@ module Prawn
       attr_reader :interlace_method, :alpha_channel
       attr_accessor :scaled_width, :scaled_height
 
+      def self.can_render?(image_blob)
+        image_blob[0, 8].unpack("C*") == [137, 80, 78, 71, 13, 10, 26, 10]
+      end
+
       # Process a new PNG image
       #
       # <tt>data</tt>:: A binary string of PNG data
@@ -88,6 +92,8 @@ module Prawn
 
           data.read(4)  # Skip the CRC
         end
+
+        @img_data = Zlib::Inflate.inflate(@img_data)
       end
 
       # number of color components to each pixel
@@ -101,32 +107,15 @@ module Prawn
         end
       end
 
-      # number of bits used per pixel
-      #
-      def pixel_bitlength
-        if alpha_channel?
-          self.bits * (self.colors + 1)
-        else
-          self.bits * self.colors
-        end
-      end
-
       # split the alpha channel data from the raw image data in images
       # where it's required.
       #
       def split_alpha_channel!
-        unfilter_image_data if alpha_channel?
+        split_image_data if alpha_channel?
       end
 
       def alpha_channel?
         @color_type == 4 || @color_type == 6
-      end
-
-      # Adobe Reader can't handle 16-bit png channels -- chop off the second
-      # byte (least significant)
-      #
-      def alpha_channel_bits
-        8
       end
 
       # Build a PDF object representing this image in +document+, and return
@@ -168,19 +157,20 @@ module Prawn
           :Subtype          => :Image,
           :Height           => height,
           :Width            => width,
-          :BitsPerComponent => bits,
-          :Filter           => :FlateDecode
+          :BitsPerComponent => bits
         )
-
-        unless alpha_channel
-          obj.data[:DecodeParms] = {:Predictor => 15,
-                                    :Colors    => colors,
-                                    :BitsPerComponent => bits,
-                                    :Columns   => width}
-        end
 
         # append the actual image data to the object as a stream
         obj << img_data
+
+        obj.stream.filters << {
+          :FlateDecode => {
+            :Predictor => 15,
+            :Colors    => colors,
+            :BitsPerComponent => bits,
+            :Columns   => width
+          }
+        }
 
         # sort out the colours of the image
         if palette.empty?
@@ -232,12 +222,20 @@ module Prawn
             :Subtype          => :Image,
             :Height           => height,
             :Width            => width,
-            :BitsPerComponent => alpha_channel_bits,
-            :Filter           => :FlateDecode,
+            :BitsPerComponent => bits,
             :ColorSpace       => :DeviceGray,
             :Decode           => [0, 1]
           )
-          smask_obj << alpha_channel
+          smask_obj.stream << alpha_channel
+
+          smask_obj.stream.filters << {
+            :FlateDecode => {
+              :Predictor => 15,
+              :Colors    => 1,
+              :BitsPerComponent => bits,
+              :Columns   => width
+            }
+          }
           obj.data[:SMask] = smask_obj
         end
 
@@ -259,103 +257,40 @@ module Prawn
 
       private
 
-      def unfilter_image_data
-        data = Zlib::Inflate.inflate(@img_data).bytes
-        @img_data = ""
-        @alpha_channel = ""
+      def split_image_data
+        alpha_bytes = bits / 8
+        color_bytes = colors * bits / 8
 
-        pixel_bytes     = pixel_bitlength / 8
-        scanline_length = pixel_bytes * self.width + 1
-        row = 0
-        pixels = []
-        row_data = [] # reused for each row of the image
-        paeth, pa, pb, pc = nil
+        scanline_length  = (color_bytes + alpha_bytes) * self.width + 1
+        scanlines = @img_data.bytesize / scanline_length
+        pixels = self.width * self.height
 
-        data.each do |byte|
-          # accumulate a whole scanline of bytes, and then process it all at once
-          # we could do this with Enumerable#each_slice, but it allocates memory,
-          #   and we are trying to avoid that
-          row_data << byte
-          next if row_data.length < scanline_length
-          
-          filter = row_data.shift
-          case filter
-          when 0 # None
-          when 1 # Sub
-            row_data.each_with_index do |byte, index|
-              left = index < pixel_bytes ? 0 : row_data[index - pixel_bytes]
-              row_data[index] = (byte + left) % 256
-              #p [byte, left, row_data[index]]
-            end
-          when 2 # Up
-            row_data.each_with_index do |byte, index|
-              col = (index / pixel_bytes).floor
-              upper = row == 0 ? 0 : pixels[row-1][col][index % pixel_bytes]
-              row_data[index] = (upper + byte) % 256
-            end
-          when 3  # Average
-            row_data.each_with_index do |byte, index|
-              col = (index / pixel_bytes).floor
-              upper = row == 0 ? 0 : pixels[row-1][col][index % pixel_bytes]
-              left = index < pixel_bytes ? 0 : row_data[index - pixel_bytes]
+        data = StringIO.new(@img_data)
+        data.binmode
 
-              row_data[index] = (byte + ((left + upper)/2).floor) % 256
-            end
-          when 4 # Paeth
-            left = upper = upper_left = nil
-            row_data.each_with_index do |byte, index|
-              col = (index / pixel_bytes).floor
+        color_data = [0x00].pack('C') * (pixels * color_bytes + scanlines)
+        color = StringIO.new(color_data)
+        color.binmode
 
-              left = index < pixel_bytes ? 0 : row_data[index - pixel_bytes]
-              if row.zero?
-                upper = upper_left = 0
-              else
-                upper = pixels[row-1][col][index % pixel_bytes]
-                upper_left = col.zero? ? 0 :
-                  pixels[row-1][col-1][index % pixel_bytes]
-              end
+        @alpha_channel = [0x00].pack('C') * (pixels * alpha_bytes + scanlines)
+        alpha = StringIO.new(@alpha_channel)
+        alpha.binmode
 
-              p = left + upper - upper_left
-              pa = (p - left).abs
-              pb = (p - upper).abs
-              pc = (p - upper_left).abs
+        scanlines.times do |line|
+          data.seek(line * scanline_length)
 
-              paeth = if pa <= pb && pa <= pc
-                left
-              elsif pb <= pc
-                upper
-              else
-                upper_left
-              end
+          filter = data.getbyte
 
-              row_data[index] = (byte + paeth) % 256
-            end
-          else
-            raise ArgumentError, "Invalid filter algorithm #{filter}"
-          end
+          color.putc filter
+          alpha.putc filter
 
-          s = []
-          row_data.each_slice pixel_bytes do |slice|
-            s << slice
-          end
-          pixels << s
-          row += 1
-          row_data.clear
-        end
-
-        # convert the pixel data to separate strings for colours and alpha
-        color_byte_size = self.colors * self.bits / 8
-        alpha_byte_size = alpha_channel_bits / 8
-        pixels.each do |this_row|
-          this_row.each do |pixel|
-            @img_data << pixel[0, color_byte_size].pack("C*")
-            @alpha_channel << pixel[color_byte_size, alpha_byte_size].pack("C*")
+          self.width.times do
+            color.write data.read(color_bytes)
+            alpha.write data.read(alpha_bytes)
           end
         end
 
-        # compress the data
-        @img_data = Zlib::Deflate.deflate(@img_data)
-        @alpha_channel = Zlib::Deflate.deflate(@alpha_channel)
+        @img_data = color_data
       end
     end
   end

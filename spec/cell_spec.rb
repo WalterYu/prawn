@@ -87,6 +87,12 @@ describe "Prawn::Table::Cell" do
 
       c.style(:padding => 50, :size => 7)
     end
+
+    it "ignores unknown properties" do
+      c = cell(:content => 'text')
+
+      c.style(:foobarbaz => 'frobnitz')
+    end
   end
 
   describe "cell width" do
@@ -135,9 +141,6 @@ describe "Prawn::Table::Cell" do
     it "should have a reasonable minimum width that can fit @content" do
       c = cell(:content => "text", :padding => 10)
       min_content_width = c.min_width - c.padding[1] - c.padding[3]
-
-      lambda { @pdf.height_of("text", :width => min_content_width) }.
-        should_not raise_error(Prawn::Errors::CannotFit)
 
       @pdf.height_of("text", :width => min_content_width).should be <
         (5 * @pdf.height_of("text"))
@@ -409,7 +412,7 @@ describe "Prawn::Table::Cell" do
         :border_width => [2, 3, 4, 5])
       c.border_widths.should == [2, 3, 4, 5]
     end
-    
+
     it "should set default border lines to :solid" do
       c = @pdf.cell(:content => "text")
       c.border_top_line.should == :solid
@@ -418,7 +421,7 @@ describe "Prawn::Table::Cell" do
       c.border_left_line.should == :solid
       c.border_lines.should == [:solid] * 4
     end
-    
+
     it "should set border line with :border_..._line" do
       c = @pdf.cell(:content => "text", :border_bottom_line => :dotted)
       c.border_bottom_line.should == :dotted
@@ -461,6 +464,47 @@ describe "Prawn::Table::Cell" do
       Prawn::Text::Box.expects(:new).checking do |text, options|
         text.should == "text"
         options[:style].should == :bold
+      end.at_least_once.returns(box)
+
+      c.draw
+    end
+
+    it "supports variant styles of the current font" do
+      font_path = "#{Prawn::BASEDIR}/data/fonts/Action Man.dfont"
+      @pdf.font_families.merge!("Action Man" => {
+        :normal    => { :file => font_path, :font => "ActionMan" },
+        :bold      => { :file => font_path, :font => "ActionMan-Bold" },
+      })
+      @pdf.font "Action Man"
+
+      c = cell(:content => "text", :font_style => :bold)
+
+      box = Prawn::Text::Box.new("text", :document => @pdf)
+      Prawn::Text::Box.expects(:new).checking do |text, options|
+        text.should == "text"
+        options[:style].should == :bold
+        @pdf.font.family.should == 'Action Man'
+      end.at_least_once.returns(box)
+
+      c.draw
+    end
+
+
+    it "uses the style of the current font if none given" do
+      font_path = "#{Prawn::BASEDIR}/data/fonts/Action Man.dfont"
+      @pdf.font_families.merge!("Action Man" => {
+        :normal    => { :file => font_path, :font => "ActionMan" },
+        :bold      => { :file => font_path, :font => "ActionMan-Bold" },
+      })
+      @pdf.font "Action Man", :style => :bold
+
+      c = cell(:content => "text")
+
+      box = Prawn::Text::Box.new("text", :document => @pdf)
+      Prawn::Text::Box.expects(:new).checking do |text, options|
+        text.should == "text"
+        @pdf.font.family.should == 'Action Man'
+        @pdf.font.options[:style].should == :bold
       end.at_least_once.returns(box)
 
       c.draw

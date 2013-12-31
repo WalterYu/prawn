@@ -17,7 +17,7 @@ require 'prawn/table/cell/span_dummy'
 module Prawn
 
   class Document
-    
+
     # Set up and draw a table on this document. A block can be given, which will
     # be run after cell setup but before layout and drawing.
     #
@@ -51,7 +51,7 @@ module Prawn
   #   Produces a text cell. This is the most common usage.
   # Prawn::Table::Cell::
   #   If you have already built a Cell or have a custom subclass of Cell you
-  #   want to use in a table, you can pass through Cell objects. 
+  #   want to use in a table, you can pass through Cell objects.
   # Prawn::Table::
   #   Creates a subtable (a table within a cell). You can use
   #   Prawn::Document#make_table to create a table for use as a subtable
@@ -73,12 +73,12 @@ module Prawn
   #   A hash of style options to style all cells. See the documentation on
   #   Prawn::Table::Cell for all cell style options.
   # +header+::
-  #   If set to +true+, the first row will be repeated on every page. The
-  #   header must be included as the first row of your data. Row numbering
-  #   (for styling and other row-specific options) always indexes based on
-  #   your data array. Whether or not you have a header, row(n) always refers
-  #   to the nth element (starting from 0) of the +data+ array.
-  # +column_widths+:: 
+  #   If set to +true+, the first row will be repeated on every page. If set
+  #   to an Integer, the first +x+ rows will be repeated on every page. Row
+  #   numbering (for styling and other row-specific options) always indexes
+  #   based on your data array. Whether or not you have a header, row(n) always
+  #   refers to the nth element (starting from 0) of the +data+ array.
+  # +column_widths+::
   #   Sets widths for individual columns. Manually setting widths can give
   #   better results than letting Prawn guess at them, as Prawn's algorithm
   #   for defaulting widths is currently pretty boneheaded. If you experience
@@ -101,7 +101,7 @@ module Prawn
   #   pdf.table(data) do |table|
   #     table.rows(1..3).width = 72
   #   end
-  # 
+  #
   # As with Prawn::Document#initialize, if the block has no arguments, it will
   # be evaluated in the context of the object itself. The above code could be
   # rewritten as:
@@ -110,7 +110,7 @@ module Prawn
   #     rows(1..3).width = 72
   #   end
   #
-  class Table  
+  class Table
 
     # Set up a table on the given document. Arguments:
     #
@@ -137,7 +137,7 @@ module Prawn
       set_column_widths
       set_row_heights
       position_cells
-    end                                        
+    end
 
     # Number of rows in the table.
     #
@@ -165,7 +165,7 @@ module Prawn
     # The block is passed a Cells object containing all cells to be rendered on
     # that page. You can change styling of the cells in this block, but keep in
     # mind that the cells have already been positioned and sized.
-    # 
+    #
     def before_rendering_page(&block)
       @before_rendering_page = block
     end
@@ -179,9 +179,9 @@ module Prawn
     # Sets column widths for the table. The argument can be one of the following
     # types:
     #
-    # +Array+:: 
+    # +Array+::
     #   <tt>[w0, w1, w2, ...]</tt> (specify a width for each column)
-    # +Hash+:: 
+    # +Hash+::
     #   <tt>{0 => w0, 1 => w1, ...}</tt> (keys are column names, values are
     #   widths)
     # +Numeric+::
@@ -207,8 +207,9 @@ module Prawn
     end
 
     # If +true+, designates the first row as a header row to be repeated on
-    # every page. Does not change row numbering -- row numbers always index into
-    # the data array provided, with no modification.
+    # every page. If an integer, designates the number of rows to be treated
+    # as a header Does not change row numbering -- row numbers always index
+    # into the data array provided, with no modification.
     #
     attr_writer :header
 
@@ -277,7 +278,13 @@ module Prawn
           # If there isn't enough room left on the page to fit the first data row
           # (excluding the header), start the table on the next page.
           needed_height = row(0).height
-          needed_height += row(1).height if @header
+          if @header
+            if @header.is_a? Integer
+              needed_height += row(1..@header).height
+            else
+              needed_height += row(1).height
+            end
+          end
           if needed_height > @pdf.y - ref_bounds.absolute_bottom
             @pdf.bounds.move_past_bottom
             offset = @pdf.y
@@ -289,7 +296,13 @@ module Prawn
         # modified in before_rendering_page callbacks.
         if @header
           @header_row = Cells.new
-          row(0).each { |cell| @header_row[cell.row, cell.column] = cell.dup }
+          if @header.is_a? Integer
+            @header.times do |r|
+              row(r).each { |cell| @header_row[cell.row, cell.column] = cell.dup }
+            end
+          else
+            row(0).each { |cell| @header_row[cell.row, cell.column] = cell.dup }
+          end
         end
 
         # Track cells to be drawn on this page. They will all be drawn when this
@@ -300,8 +313,8 @@ module Prawn
           if cell.height > (cell.y + offset) - ref_bounds.absolute_bottom &&
              cell.row > started_new_page_at_row
             # Ink all cells on the current page
-            if @before_rendering_page
-              c = Cells.new(cells_this_page.map { |c, _| c })
+            if defined?(@before_rendering_page) && @before_rendering_page
+              c = Cells.new(cells_this_page.map { |ci, _| ci })
               @before_rendering_page.call(c)
             end
             Cell.draw_cells(cells_this_page)
@@ -309,31 +322,49 @@ module Prawn
 
             # start a new page or column
             @pdf.bounds.move_past_bottom
+            x_offset = @pdf.bounds.left_side - @pdf.bounds.absolute_left
             if cell.row > 0 && @header
-              header_height = add_header(cells_this_page, @pdf.cursor, cell.row-1)
+              if @header.is_a? Integer
+                header_height = 0
+                y_coord = @pdf.cursor
+                @header.times do |h|
+                  additional_header_height = add_header(cells_this_page, x_offset, y_coord-header_height, cell.row-1, h)
+                  header_height += additional_header_height
+                end
+              else
+                header_height = add_header(cells_this_page, x_offset, @pdf.cursor, cell.row-1)
+              end
             else
               header_height = 0
             end
             offset = @pdf.y - cell.y - header_height
             started_new_page_at_row = cell.row
           end
-   
+
           # Don't modify cell.x / cell.y here, as we want to reuse the original
           # values when re-inking the table. #draw should be able to be called
           # multiple times.
           x, y = cell.x, cell.y
-          y += offset 
+          y += offset
 
-          # Translate coordinates to the bounds we are in, since drawing is 
+          # Translate coordinates to the bounds we are in, since drawing is
           # relative to the cursor, not ref_bounds.
           x += @pdf.bounds.left_side - @pdf.bounds.absolute_left
           y -= @pdf.bounds.absolute_bottom
 
           # Set background color, if any.
-          if @row_colors && (!@header || cell.row > 0)
+          if defined?(@row_colors) && @row_colors && (!@header || cell.row > 0)
             # Ensure coloring restarts on every page (to make sure the header
             # and first row of a page are not colored the same way).
-            index = cell.row - [started_new_page_at_row, @header ? 1 : 0].max
+            if @header.is_a? Integer
+              rows = @header
+            elsif @header
+              rows = 1
+            else
+              rows = 0
+            end
+            index = cell.row - [started_new_page_at_row, rows].max
+
             cell.background_color ||= @row_colors[index % @row_colors.length]
           end
 
@@ -341,8 +372,8 @@ module Prawn
           last_y = y
         end
         # Draw the last page of cells
-        if @before_rendering_page
-          c = Cells.new(cells_this_page.map { |c, _| c })
+        if defined?(@before_rendering_page) && @before_rendering_page
+          c = Cells.new(cells_this_page.map { |ci, _| ci })
           @before_rendering_page.call(c)
         end
         Cell.draw_cells(cells_this_page)
@@ -426,7 +457,7 @@ module Prawn
       assert_proper_table_data(data)
 
       cells = Cells.new
-      
+
       row_number = 0
       data.each do |row_cells|
         column_number = 0
@@ -449,7 +480,7 @@ module Prawn
               next if i == 0 && j == 0
 
               # It is an error to specify spans that overlap; catch this here
-              if bad_cell = cells[row_number + i, column_number + j]
+              if cells[row_number + i, column_number + j]
                 raise Prawn::Errors::InvalidTableSpan,
                   "Spans overlap at row #{row_number + i}, " +
                   "column #{column_number + j}."
@@ -481,19 +512,22 @@ module Prawn
       cells
     end
 
-    # Add the header row to the given array of cells at the given y-position.
+    # Add the header row(s) to the given array of cells at the given y-position.
     # Number the row with the given +row+ index, so that the header appears (in
     # any Cells built for this page) immediately prior to the first data row on
     # this page.
     #
     # Return the height of the header.
     #
-    def add_header(page_of_cells, y, row)
-      @header_row.each do |cell|
+    def add_header(page_of_cells, x_offset, y, row, row_of_header=nil)
+      rows_to_operate_on = @header_row
+      rows_to_operate_on = @header_row.rows(row_of_header) if row_of_header
+      rows_to_operate_on.each do |cell|
         cell.row = row
-        page_of_cells << [cell, [cell.x, y]]
+        cell.dummy_cells.each {|c| c.row = row }
+        page_of_cells << [cell, [cell.x + x_offset, y]]
       end
-      @header_row.height
+      rows_to_operate_on.height
     end
 
     # Raises an error if the data provided cannot be converted into a valid
@@ -547,7 +581,7 @@ module Prawn
     # values that will be used to ink the table.
     #
     def set_column_widths
-      column_widths.each_with_index do |w, col_num| 
+      column_widths.each_with_index do |w, col_num|
         column(col_num).width = w
       end
     end
@@ -564,7 +598,7 @@ module Prawn
     #
     def position_cells
       # Calculate x- and y-positions as running sums of widths / heights.
-      x_positions = column_widths.inject([0]) { |ary, x| 
+      x_positions = column_widths.inject([0]) { |ary, x|
         ary << (ary.last + x); ary }[0..-2]
       x_positions.each_with_index { |x, i| column(i).x = x }
 
@@ -579,7 +613,7 @@ module Prawn
     # :position option, and yields.
     #
     def with_position
-      x = case @position || :left
+      x = case defined?(@position) && @position || :left
           when :left   then return yield
           when :center then (@pdf.bounds.width - width) / 2.0
           when :right  then  @pdf.bounds.width - width

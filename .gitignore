@@ -9,3 +9,4 @@ manual.pdf
 /doc
 .DS_Store
 *.sh
+/bin

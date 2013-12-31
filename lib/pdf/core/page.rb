@@ -7,15 +7,13 @@
 # This is free software. Please see the LICENSE and COPYING files for details.
 #
 
-require 'prawn/document/graphics_state'
+require_relative 'graphics_state'
 
-module Prawn
+module PDF
   module Core
     class Page #:nodoc:
-
-      include Prawn::Core::Page::GraphicsState
-
-      attr_accessor :document, :content, :dictionary, :margins, :stack
+      attr_accessor :document, :margins, :stack
+      attr_writer :content, :dictionary
 
       def initialize(document, options={})
         @document = document
@@ -23,7 +21,7 @@ module Prawn
                                            :right   => 36,
                                            :top     => 36,
                                            :bottom  => 36  }
-        @stack = Prawn::GraphicStateStack.new(options[:graphic_state])
+        @stack = GraphicStateStack.new(options[:graphic_state])
         if options[:object_id]
           init_from_object(options)
         else
@@ -31,8 +29,12 @@ module Prawn
         end
       end
 
+      def graphic_state
+        stack.current_state
+      end
+
       def layout
-        return @layout if @layout
+        return @layout if defined?(@layout) && @layout
 
         mb = dictionary.data[:MediaBox]
         if mb[3] > mb[2]
@@ -43,7 +45,7 @@ module Prawn
       end
 
       def size
-        @size || dimensions[2,2]
+        defined?(@size) && @size || dimensions[2,2]
       end
 
       def in_stamp_stream?
@@ -89,7 +91,7 @@ module Prawn
       end
 
       def dictionary
-        @stamp_dictionary || document.state.store[@dictionary]
+        defined?(@stamp_dictionary) && @stamp_dictionary || document.state.store[@dictionary]
       end
 
       def resources
@@ -127,10 +129,10 @@ module Prawn
       def finalize
         if dictionary.data[:Contents].is_a?(Array)
           dictionary.data[:Contents].each do |stream|
-            stream.compress_stream if document.compression_enabled?
+            stream.stream.compress! if document.compression_enabled?
           end
         else
-          content.compress_stream if document.compression_enabled?
+          content.stream.compress! if document.compression_enabled?
         end
       end
 
@@ -141,14 +143,14 @@ module Prawn
       def dimensions
         return inherited_dictionary_value(:MediaBox) if imported_page?
 
-        coords = Prawn::Document::PageGeometry::SIZES[size] || size
+        coords = PDF::Core::PageGeometry::SIZES[size] || size
         [0,0] + case(layout)
         when :portrait
           coords
         when :landscape
           coords.reverse
         else
-          raise Prawn::Errors::InvalidPageLayout,
+          raise PDF::Core::Errors::InvalidPageLayout,
             "Layout must be either :portrait or :landscape"
         end
       end
@@ -172,6 +174,10 @@ module Prawn
         @size     = options[:size]    ||  "LETTER"
         @layout   = options[:layout]  || :portrait
 
+        @stamp_stream      = nil
+        @stamp_dictionary  = nil
+        @imported_page     = false
+
         @content    = document.ref({})
         content << "q" << "\n"
         @dictionary = document.ref(:Type        => :Page,
@@ -180,9 +186,6 @@ module Prawn
                                    :Contents    => content)
 
         resources[:ProcSet] = [:PDF, :Text, :ImageB, :ImageC, :ImageI]
-
-        @stamp_stream      = nil
-        @stamp_dictionary  = nil
       end
 
       # some entries in the Page dict can be inherited from parent Pages dicts.
@@ -204,9 +207,6 @@ module Prawn
           nil
         end
       end
-
     end
-
   end
 end
-
