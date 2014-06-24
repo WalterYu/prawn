@@ -10,6 +10,9 @@ require_relative '../../prawn/encoding'
 
 module Prawn
   class Font
+
+    # @private
+
     class AFM < Font
       BUILT_INS = %w[ Courier Helvetica Times-Roman Symbol ZapfDingbats
                       Courier-Bold Courier-Oblique Courier-BoldOblique
@@ -154,7 +157,7 @@ module Prawn
       end
 
       def parse_afm(file_name)
-        data    = {:glyph_widths => {}, :bounding_boxes => {}, :kern_pairs => {}, :attributes => {}}         
+        data    = {:glyph_widths => {}, :bounding_boxes => {}, :kern_pairs => {}, :attributes => {}}
         section = []
 
         File.foreach(file_name) do |line|
@@ -184,7 +187,7 @@ module Prawn
             parse_generic_afm_attribute(line, data)
           end
         end
-        
+
         # process data parsed from AFM file to build tables which
         #   will be used when measuring and kerning text
         data[:glyph_table] = (0..255).map do |i|
@@ -231,9 +234,9 @@ module Prawn
           e.respond_to?(:force_encoding) ? e.force_encoding(::Encoding::Windows_1252) : e
         }
       end
-      
+
       private
-      
+
       def unscaled_width_of(string)
         string.bytes.inject(0) do |s,r|
           s + @glyph_table[r]
