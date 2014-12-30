@@ -1,0 +1,14 @@
+git add	data/pdfs/cem/1200to70dpi/CEM2024_production.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2030_production.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2030_production_v1.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2034_production.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2034_production_v1.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2035_production.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2035_production_v1.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2040_production.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2040_production_v1.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2041_production.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2045_production.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM2045_production_v2.pdf
+git add	data/pdfs/cem/1200to70dpi/CEM4601_production.pdf
+git add	data/pdfs/cem_template/
