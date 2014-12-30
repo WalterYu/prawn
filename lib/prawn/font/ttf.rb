@@ -173,6 +173,10 @@ module Prawn
         end
       end
 
+      def to_utf8(text)
+        text.encode("UTF-8")
+      end
+
       def glyph_present?(char)
         code = char.codepoints.first
         cmap[code] > 0
@@ -245,7 +249,7 @@ module Prawn
 
         # Embed the font metrics in the document after everything has been
         # drawn, just before the document is emitted.
-        @document.before_render { |doc| embed(ref, subset) }
+        @document.renderer.before_render { |doc| embed(ref, subset) }
 
         ref
       end

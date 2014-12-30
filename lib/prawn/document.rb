@@ -12,7 +12,6 @@ require_relative "document/bounding_box"
 require_relative "document/column_box"
 require_relative "document/internals"
 require_relative "document/span"
-require_relative "document/graphics_state"
 
 module Prawn
 
@@ -53,7 +52,6 @@ module Prawn
     include Prawn::Document::Internals
     include PDF::Core::Annotations
     include PDF::Core::Destinations
-    include Prawn::Document::GraphicsState
     include Prawn::Document::Security
     include Prawn::Text
     include Prawn::Graphics
@@ -68,7 +66,7 @@ module Prawn
 
     VALID_OPTIONS = [:page_size, :page_layout, :margin, :left_margin,
                      :right_margin, :top_margin, :bottom_margin, :skip_page_creation,
-                     :compress, :skip_encoding, :background, :info,
+                     :compress, :background, :info,
                      :text_formatter, :print_scaling]
 
     # Any module added to this array will be included into instances of
@@ -202,9 +200,9 @@ module Prawn
       self.class.extensions.reverse_each { |e| extend e }
       @internal_state = PDF::Core::DocumentState.new(options)
       @internal_state.populate_pages_from_store(self)
-      min_version(state.store.min_version) if state.store.min_version
+      renderer.min_version(state.store.min_version) if state.store.min_version
 
-      min_version(1.6) if options[:print_scaling] == :none
+      renderer.min_version(1.6) if options[:print_scaling] == :none
 
       @background = options[:background]
       @background_scale = options[:background_scale] || 1
@@ -245,7 +243,7 @@ module Prawn
       if last_page = state.page
         last_page_size    = last_page.size
         last_page_layout  = last_page.layout
-        last_page_margins = last_page.margins
+        last_page_margins = last_page.margins.dup
       end
 
       page_options = {:size => options[:size] || last_page_size,
@@ -349,23 +347,13 @@ module Prawn
     # Renders the PDF document to string.
     # Pass an open file descriptor to render to file.
     #
-    def render(output = StringIO.new)
-      if output.instance_of?(StringIO)
-        output.set_encoding(::Encoding::ASCII_8BIT)
+    def render(*a, &b)
+      (1..page_count).each do |i|
+        go_to_page i
+        repeaters.each { |r| r.run(i) }
       end
-      finalize_all_page_contents
 
-      render_header(output)
-      render_body(output)
-      render_xref(output)
-      render_trailer(output)
-      if output.instance_of?(StringIO)
-        str = output.string
-        str.force_encoding(::Encoding::ASCII_8BIT)
-        return str
-      else
-        return nil
-      end
+      renderer.render(*a, &b)
     end
 
     # Renders the PDF document to file.
@@ -565,13 +553,6 @@ module Prawn
         end
         pseudopage += 1 if start_count
       end
-    end
-
-    # Returns true if content streams will be compressed before rendering,
-    # false otherwise
-    #
-    def compression_enabled?
-      !!state.compress
     end
 
     # @group Experimental API
