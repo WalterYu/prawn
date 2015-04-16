@@ -15,7 +15,7 @@ Gem::Specification.new do |spec|
                  "COPYING", "LICENSE", "GPLv2", "GPLv3",
                  ".yardopts"]
   spec.require_path = "lib"
-  spec.required_ruby_version = '>= 1.9.3'
+  spec.required_ruby_version = '>= 2.0.0'
   spec.required_rubygems_version = ">= 1.3.6"
 
   spec.test_files = Dir[ "spec/*_spec.rb" ]
@@ -25,7 +25,7 @@ Gem::Specification.new do |spec|
   spec.licenses = ['RUBY', 'GPL-2', 'GPL-3']
 
   spec.add_dependency('ttfunk', '~> 1.4.0')
-  spec.add_dependency('pdf-core', "~> 0.5.0")
+  spec.add_dependency('pdf-core', "~> 0.5.1")
 
   spec.add_development_dependency('pdf-inspector', '~> 1.2.0')
   spec.add_development_dependency('yard')
@@ -35,26 +35,11 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency('simplecov')
   spec.add_development_dependency('prawn-manual_builder', ">= 0.2.0")
   spec.add_development_dependency('pdf-reader', '~>1.2')
-  spec.add_development_dependency('rubocop', '0.20.1')
+  spec.add_development_dependency('rubocop', '0.28.0')
   spec.add_development_dependency('code_statistics', '0.2.13')
 
   spec.homepage = "http://prawn.majesticseacreature.com"
   spec.description = <<END_DESC
   Prawn is a fast, tiny, and nimble PDF generator for Ruby
-END_DESC
-  spec.post_install_message = <<END_DESC
-
-  ********************************************
-
-
-  A lot has changed recently in Prawn.
-
-  Please read the changelog for details:
-
-  https://github.com/prawnpdf/prawn/wiki/CHANGELOG
-
-
-  ********************************************
-
 END_DESC
 end

@@ -27,7 +27,7 @@ One thing Prawn is not, and will never be, is an HTML to PDF generator. For thos
 
 Because Prawn is pure Ruby and all of its runtime dependencies are maintained
 by us, it should work pretty much anywhere. We officially support 
-MRI {1.9.3, 2.0.0, 2.1.x} and jruby 1.7.x (>= 1.7.9) in 1.9 mode, however 
+MRI {2.0.0, 2.1.x, 2.2.x} and jruby 1.7.x (>= 1.7.18) in 2.0 mode, however 
 we will accept patches to fix problems on other 
 Ruby platforms if they aren't too invasive.
 
@@ -67,11 +67,11 @@ Note that while we will try to keep the downloadable manual up to date, that it'
 
 Before upgrading Prawn on one of your projects, you should read our [API
 compatibility](https://github.com/prawnpdf/prawn/wiki/API-Compatibility-Notes)
-guidelines. Generally speaking, you can expect tiny version updates to always be
-safe upgrades, but minor and major updates can introduce incompatibilities.
+guidelines. Generally speaking, you can expect tiny and minor version updates to always be
+safe upgrades, but major updates can introduce incompatibilities.
 
-Be sure to read the release notes each time we cut a new release and lock your gems accordingly. 
-You can find the project CHANGELOG at: https://github.com/prawnpdf/prawn/wiki/CHANGELOG
+Be sure to read the release notes in CHANGELOG.md each time we cut a 
+new release, and lock your gems accordingly. 
 
 ## Support 
 
@@ -120,7 +120,7 @@ overall direction of the project.
 These are the folks to contact if you have a maintenance-related issue with
 Prawn:
 
-* Gregory Brown (sandal)
+* Gregory Brown (practicingruby)
 * Evan Sharp (PacketMonkey)
 * Alexander Mankuta (cheba)
 
